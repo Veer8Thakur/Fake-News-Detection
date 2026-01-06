@@ -1,17 +1,31 @@
 import streamlit as st
-import pickle
 import pandas as pd
+import joblib, requests, io
 
-# Load the saved model + vectorizer
-with open("logistic_regression_tfidf.pkl", "rb") as f:
-    data = pickle.load(f)
-    model = data["model"]
-    vectorizer = data["vectorizer"]
+# Page config
+st.set_page_config(page_title="Fake News Detection", page_icon="📰", layout="centered")
+
+# Cached model loader
+@st.cache_resource
+def load_model(url):
+    if url is None:
+        return None
+    bytes_ = requests.get(url, timeout=30).content
+    return joblib.load(io.BytesIO(bytes_))
+
+# Load model + vectorizer from Streamlit secrets
+model_data = load_model(st.secrets.get("MODEL_URL"))
+if model_data:
+    model = model_data["model"]
+    vectorizer = model_data["vectorizer"]
+else:
+    st.error("⚠️ Model not available. Please configure MODEL_URL in Streamlit secrets.")
+    st.stop()
 
 # App title
 st.title("📰 Fake News Detection App")
 
-# Sidebar with simple explanation
+# Sidebar info
 st.sidebar.title("About This App")
 st.sidebar.write(
     "This tool helps you check whether a news headline or article is likely to be "
@@ -27,7 +41,7 @@ if st.button("Predict"):
     if user_input.strip() == "":
         st.warning("Please enter some text to classify.")
     else:
-        # Transform input using the vectorizer
+        # Transform input
         transformed_input = vectorizer.transform([user_input])
 
         # Predict
